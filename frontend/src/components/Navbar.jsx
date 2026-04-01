@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import socket from '../services/socket';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -8,7 +9,19 @@ export default function Navbar() {
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  // Handle Join Room Click - Check if logged in first
+  const handleJoinClick = () => {
+    if (!user) {
+      alert("Please login first to join a room!");
+      navigate('/login');
+      return;
+    }
+    setShowJoinModal(true);
+  };
 
   const handleJoinRoom = () => {
     if (!playerName.trim()) return alert('Please enter your name');
@@ -23,26 +36,10 @@ export default function Navbar() {
     });
   };
 
-  useEffect(() => {
-    socket.on('playerJoined', () => {
-      setLoading(false);
-      setShowJoinModal(false);
-      const currentRoomCode = roomCode.trim().toUpperCase();
-      if (currentRoomCode) {
-        navigate(`/game/${currentRoomCode}`);
-      }
-    });
-
-    socket.on('error', (msg) => {
-      setLoading(false);
-      alert(msg || 'Failed to join room');
-    });
-
-    return () => {
-      socket.off('playerJoined');
-      socket.off('error');
-    };
-  }, [roomCode, navigate]);
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -51,7 +48,7 @@ export default function Navbar() {
           
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-yellow-400 rounded-2xl flex items-center justify-center text-3xl animate-pulse">🎲</div>
+            <div className="w-11 h-11 bg-yellow-400 rounded-2xl flex items-center justify-center text-3xl">🎲</div>
             <div>
               <h1 className="text-3xl font-black text-white tracking-tighter">BINGO</h1>
               <p className="text-xs text-yellow-400 -mt-1">Real-time Game</p>
@@ -60,56 +57,91 @@ export default function Navbar() {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-8 text-white font-medium">
-            <Link to="/" className="hover:text-yellow-400 transition-all duration-300">Home</Link>
+            <Link to="/" className="hover:text-yellow-400 transition">Home</Link>
+            
             <button 
-              onClick={() => setShowJoinModal(true)}
-              className="hover:text-yellow-400 transition-all duration-300"
+              onClick={handleJoinClick}           // ← Changed here
+              className="hover:text-yellow-400 transition"
             >
               Join Room
             </button>
-            <Link to="/" className="hover:text-yellow-400 transition-all duration-300">Create Room</Link>
+
+            <Link to="/" className="hover:text-yellow-400 transition">Create Room</Link>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden text-white text-3xl"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? '✖️' : '☰'}
-          </button>
+          {/* Right Side - User Info */}
+          <div className="flex items-center gap-4">
+            {user ? (
+              <div className="hidden md:flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-sm text-white/70">Hi,</p>
+                  <p className="font-semibold text-yellow-400">{user.name}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 rounded-xl text-sm font-medium transition"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <Link 
+                to="/login"
+                className="hidden md:block px-6 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition"
+              >
+                Login 
+              </Link>
+            )}
+
+            {/* Mobile Menu Button */}
+            <button
+              className="md:hidden text-white text-3xl"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? '✖️' : '☰'}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-black/60 backdrop-blur-md text-white flex flex-col gap-4 px-6 py-4 border-t border-white/10">
-            <Link 
-              to="/" 
-              className="hover:text-yellow-400 transition-all duration-300"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Home
-            </Link>
-            <button 
-              onClick={() => { setShowJoinModal(true); setMobileMenuOpen(false); }}
-              className="hover:text-yellow-400 transition-all duration-300 text-left"
-            >
-              Join Room
-            </button>
-            <Link 
-              to="/" 
-              className="hover:text-yellow-400 transition-all duration-300"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Create Room
-            </Link>
+          <div className="md:hidden bg-black/80 backdrop-blur-md text-white px-6 py-6 border-t border-white/10">
+            <div className="flex flex-col gap-5 text-lg">
+              <Link to="/" onClick={() => setMobileMenuOpen(false)}>Home</Link>
+              
+              <button 
+                onClick={() => { 
+                  setMobileMenuOpen(false); 
+                  handleJoinClick(); 
+                }}
+                className="text-left"
+              >
+                Join Room
+              </button>
+
+              <Link to="/" onClick={() => setMobileMenuOpen(false)}>Create Room</Link>
+
+              {user ? (
+                <button 
+                  onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                  className="text-red-400 text-left"
+                >
+                  Logout
+                </button>
+              ) : (
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                  Login 
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </nav>
 
-      {/* Join Room Modal */}
-      {showJoinModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]">
-          <div className="bg-white/10 backdrop-blur-2xl p-10 rounded-3xl w-full max-w-md border border-white/30 animate-scaleUp">
+      {/* Join Room Modal - Only shown if user is logged in */}
+      {showJoinModal && user && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white/10 backdrop-blur-2xl p-10 rounded-3xl w-full max-w-md border border-white/30">
             <h2 className="text-3xl font-bold text-center mb-8 text-white">Join a Room</h2>
 
             <input
@@ -123,15 +155,15 @@ export default function Navbar() {
 
             <input
               type="text"
-              placeholder="ROOM CODE (6 characters)"
+              placeholder="ROOM CODE"
               value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
-              maxLength={7}
+              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              maxLength={6}
               className="w-full px-6 py-4 bg-white/20 border border-white/30 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400 mb-8 uppercase tracking-widest"
               disabled={loading}
             />
 
-            <div className="flex gap-4 flex-col sm:flex-row">
+            <div className="flex gap-4">
               <button
                 onClick={() => {
                   setShowJoinModal(false);
